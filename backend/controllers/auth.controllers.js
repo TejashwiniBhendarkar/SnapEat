@@ -1,99 +1,100 @@
 import User from "../models/user.model.js"
-import bcrypt from "bcryptjs"
-import getToken from "../utils/token.js"
+import bcrypt, { hash } from "bcryptjs"
+import genToken from "../utils/token.js"
 import { sendOtpMail } from "../utils/mail.js"
-
-export const signUp = async(req,res) =>{
+export const signUp=async (req,res) => {
     try {
-        const {fullName,email,password,mobile,role} = req.body
-        let user = await User.findOne({email})
+        const {fullName,email,password,mobile,role}=req.body
+        let user=await User.findOne({email})
         if(user){
-            return res.status(400).json({message:"User Already Exist"})
+            return res.status(400).json({message:"User Already exist."})
         }
-        if(password.length<8){
-            return res.status(400).json({message:"Password must be at least 8 characters"})
+        if(password.length<6){
+            return res.status(400).json({message:"password must be at least 6 characters."})
         }
         if(mobile.length<10){
-            return res.status(400).json({message:"Mobile No. must be of 10 digits"})
+            return res.status(400).json({message:"mobile no must be at least 10 digits."})
         }
-
-        const hashedPassword = await bcrypt.hash(password,10)
-        user = await User.create({
+     
+        const hashedPassword=await bcrypt.hash(password,10)
+        user=await User.create({
             fullName,
             email,
-            mobile,
             role,
+            mobile,
             password:hashedPassword
         })
-        const token = await getToken(user._id)
+
+        const token=await genToken(user._id)
         res.cookie("token",token,{
             secure:false,
             sameSite:"strict",
             maxAge:7*24*60*60*1000,
             httpOnly:true
         })
-        return res.status(400).json(user)
+  
+        return res.status(201).json(user)
 
     } catch (error) {
-         return res.status(500).json(`signup error ${error}`)
+        return res.status(500).json(`sign up error ${error}`)
     }
 }
 
-export const signIn = async(req,res) =>{
+export const signIn=async (req,res) => {
     try {
-        const {email,password} = req.body
-        const user = await User.findOne({email})
+        const {email,password}=req.body
+        const user=await User.findOne({email})
         if(!user){
-            return res.status(400).json({message:"User does not Exist"})
+            return res.status(400).json({message:"User does not exist."})
         }
-      
-        const isMatch = await bcrypt.compare(password,user.password)
-        if(!isMatch){
-            return res.status(400).json({message:"Incorrect password"})
-        }
+        
+     const isMatch=await bcrypt.compare(password,user.password)
+     if(!isMatch){
+         return res.status(400).json({message:"incorrect Password"})
+     }
 
-        const token = await getToken(user._id)
+        const token=await genToken(user._id)
         res.cookie("token",token,{
             secure:false,
             sameSite:"strict",
             maxAge:7*24*60*60*1000,
             httpOnly:true
         })
+  
         return res.status(200).json(user)
 
     } catch (error) {
-         return res.status(500).json(`signin error ${error}`)
+        return res.status(500).json(`sign In error ${error}`)
     }
 }
 
-export const signOut = async(req,res) => {
+export const signOut=async (req,res) => {
     try {
         res.clearCookie("token")
-        return res.status(200).json({message:"logout successfully"})
+return res.status(200).json({message:"log out successfully"})
     } catch (error) {
-        return res.status(500).json(`logout error ${error}`)
+        return res.status(500).json(`sign out error ${error}`)
     }
 }
 
-export const sendOtp = async (req,res) => {
-    try {
-        const {email} = req.body
-        const user = await User.findOne({email})
-        if(!user){
-             return res.status(400).json({message:"User does not exist"})
-        }
-        const otp = Math.floor(1000 + Math.random()*9000).toString()
-        user.resetOtp=otp
-        user.otpExpires=Date.now()+5*60*1000
-        user.isOtpVerified=false
-        await user.save()
-        await sendOtpMail(email,otp)
-         return res.status(200).json({message:"OTP sent successfully"})
-    } catch (error) {
-          return res.status(500).json(`send otp errpr ${error}`)
+export const sendOtp=async (req,res) => {
+  try {
+    const {email}=req.body
+    const user=await User.findOne({email})
+    if(!user){
+       return res.status(400).json({message:"User does not exist."})
     }
+    const otp=Math.floor(1000 + Math.random() * 9000).toString()
+    user.resetOtp=otp
+    user.otpExpires=Date.now()+5*60*1000
+    user.isOtpVerified=false
+    await user.save()
+    await sendOtpMail(email,otp)
+    return res.status(200).json({message:"otp sent successfully"})
+  } catch (error) {
+     return res.status(500).json(`send otp error ${error}`)
+  }  
 }
-
 
 export const verifyOtp=async (req,res) => {
     try {
