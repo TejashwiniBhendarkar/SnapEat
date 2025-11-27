@@ -4,6 +4,9 @@ import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';  
 import ForgotPassword from './pages/ForgotPassword';
 
+
+export const serverUrl="http://localhost:8000"
+
 function App() {
   return ( 
     <Routes>
