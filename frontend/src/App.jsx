@@ -27,7 +27,7 @@ import useUpdateLocation from "./hooks/useUpdateLocation";
 
 import socket from "./socket";
 
-export const serverUrl = "http://localhost:8000";
+export const serverUrl = "https://cravecart-igj4.onrender.com";
 
 function App() {
   const { userData } = useSelector(state => state.user);
