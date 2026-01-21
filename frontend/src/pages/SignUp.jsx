@@ -79,7 +79,7 @@ function SignUp() {
                 style={{ border: `1px solid ${borderColor}` }}
             >
                 <h1 className='text-3xl font-bold mb-2' style={{ color: primaryColor }}>
-                    SnapEat
+                    CraveCart
                 </h1>
 
                 <p className='text-gray-600 mb-8'>

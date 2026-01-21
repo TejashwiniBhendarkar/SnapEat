@@ -2,43 +2,108 @@ import User from "../models/user.model.js"
 import bcrypt, { hash } from "bcryptjs"
 import genToken from "../utils/token.js"
 import { sendOtpMail } from "../utils/mail.js"
-export const signUp=async (req,res) => {
-    try {
-        const {fullName,email,password,mobile,role}=req.body
-        let user=await User.findOne({email})
-        if(user){
-            return res.status(400).json({message:"User Already exist."})
-        }
-        if(password.length<6){
-            return res.status(400).json({message:"password must be at least 6 characters."})
-        }
-        if(mobile.length<10){
-            return res.status(400).json({message:"mobile no must be at least 10 digits."})
-        }
+// export const signUp=async (req,res) => {
+//     try {
+//         const {fullName,email,password,mobile,role}=req.body
+//         let user=await User.findOne({email})
+//         if(user){
+//             return res.status(400).json({message:"User Already exist."})
+//         }
+//         if(password.length<6){
+//             return res.status(400).json({message:"password must be at least 6 characters."})
+//         }
+//         if(mobile.length<10){
+//             return res.status(400).json({message:"mobile no must be at least 10 digits."})
+//         }
      
-        const hashedPassword=await bcrypt.hash(password,10)
-        user=await User.create({
-            fullName,
-            email,
-            role,
-            mobile,
-            password:hashedPassword
-        })
+//         const hashedPassword=await bcrypt.hash(password,10)
+//         user=await User.create({
+//             fullName,
+//             email,
+//             role,
+//             mobile,
+//             password:hashedPassword
+//         })
 
-        const token=await genToken(user._id)
-        res.cookie("token",token,{
-            secure:false,
-            sameSite:"lax",
-            maxAge:7*24*60*60*1000,
-            httpOnly:true
-        })
+//         const token=await genToken(user._id)
+//         res.cookie("token",token,{
+//             secure:false,
+//             sameSite:"lax",
+//             maxAge:7*24*60*60*1000,
+//             httpOnly:true
+//         })
   
-        return res.status(201).json(user)
+//         return res.status(201).json(user)
 
-    } catch (error) {
-        return res.status(500).json(`sign up error ${error}`)
+//     } catch (error) {
+//         return res.status(500).json(`sign up error ${error}`)
+//     }
+// }
+export const signUp = async (req, res) => {
+  try {
+    const { fullName, email, password, mobile, role } = req.body;
+
+    // ✅ REQUIRED FIELD CHECK
+    if (!fullName || !email || !password || !mobile || !role) {
+      return res.status(400).json({ message: "All fields are required" });
     }
-}
+
+    // ✅ ROLE VALIDATION (VERY IMPORTANT)
+    const allowedRoles = ["user", "owner", "deliveryBoy"];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
+
+    // ✅ CHECK EXISTING USER
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    // ✅ PASSWORD LENGTH
+    if (password.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters" });
+    }
+
+    // ✅ MOBILE LENGTH
+    if (mobile.length < 10) {
+      return res
+        .status(400)
+        .json({ message: "Mobile number must be at least 10 digits" });
+    }
+
+    // ✅ HASH PASSWORD
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // ✅ CREATE USER
+    const user = await User.create({
+      fullName,
+      email,
+      password: hashedPassword,
+      mobile,
+      role
+    });
+
+    // ✅ GENERATE TOKEN
+    const token = genToken(user._id);
+
+    // ✅ SET COOKIE
+    res.cookie("token", token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false,
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+
+    return res.status(201).json(user);
+  } catch (error) {
+    console.error("SIGNUP ERROR:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
 
 export const signIn=async (req,res) => {
     try {
