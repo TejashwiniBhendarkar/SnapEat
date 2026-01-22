@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import Nav from "./Nav";
 import { useSelector } from "react-redux";
@@ -15,7 +16,7 @@ function DeliveryBoy() {
   const [otp, setOtp] = useState("");
   const [deliveryBoyLocation, setDeliveryBoyLocation] = useState(null);
 
-  // 🔥 SEPARATE LOADING STATES (IMPORTANT FIX)
+  // 🔥 FIX: separate loaders
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
 
@@ -65,7 +66,7 @@ function DeliveryBoy() {
   }, [socket]);
 
   /* =========================
-     📡 API CALLS
+     📡 API
   ========================= */
   const getAssignments = async () => {
     try {
@@ -92,20 +93,16 @@ function DeliveryBoy() {
   };
 
   const acceptOrder = async id => {
-    try {
-      await axios.get(
-        `${serverUrl}/api/order/accept-order/${id}`,
-        { withCredentials: true }
-      );
-      getAssignments();
-      getCurrentOrder();
-    } catch {
-      alert("Failed to accept order");
-    }
+    await axios.get(
+      `${serverUrl}/api/order/accept-order/${id}`,
+      { withCredentials: true }
+    );
+    getAssignments();
+    getCurrentOrder();
   };
 
   /* =========================
-     📩 SEND DELIVERY OTP
+     📩 SEND OTP (FIXED)
   ========================= */
   const sendOtp = async () => {
     setSendingOtp(true);
@@ -114,7 +111,7 @@ function DeliveryBoy() {
         `${serverUrl}/api/order/send-delivery-otp`,
         {
           orderId: currentOrder._id,
-          shopOrderId: currentOrder.shopOrder._id
+          shopOrderId: currentOrder.shopOrders[0]._id // ✅ FIX
         },
         { withCredentials: true }
       );
@@ -127,7 +124,7 @@ function DeliveryBoy() {
   };
 
   /* =========================
-     ✅ VERIFY DELIVERY OTP
+     ✅ VERIFY OTP (FIXED)
   ========================= */
   const verifyOtp = async () => {
     setVerifyingOtp(true);
@@ -136,7 +133,7 @@ function DeliveryBoy() {
         `${serverUrl}/api/order/verify-delivery-otp`,
         {
           orderId: currentOrder._id,
-          shopOrderId: currentOrder.shopOrder._id,
+          shopOrderId: currentOrder.shopOrders[0]._id, // ✅ FIX
           otp
         },
         { withCredentials: true }
@@ -179,7 +176,9 @@ function DeliveryBoy() {
     <div className="min-h-screen w-full bg-[#fff9f6]">
       <Nav />
 
+      {/* ================= CONTENT ================= */}
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+
         {!currentOrder && (
           <section>
             <h2 className="text-xl font-semibold mb-4">Available Orders</h2>
@@ -193,9 +192,13 @@ function DeliveryBoy() {
                 {availableAssignments.map((a, i) => (
                   <div key={i} className="bg-white p-6 rounded-2xl shadow">
                     <p className="font-semibold text-lg">{a.shopName}</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {a.deliveryAddress?.text}
+                    </p>
+
                     <button
                       onClick={() => acceptOrder(a.assignmentId)}
-                      className="mt-5 w-full bg-orange-500 text-white py-3 rounded-xl font-semibold"
+                      className="mt-5 w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold"
                     >
                       Accept Order
                     </button>
@@ -208,6 +211,8 @@ function DeliveryBoy() {
 
         {currentOrder && (
           <section className="bg-white rounded-3xl shadow p-6 space-y-4">
+            <h2 className="text-xl font-semibold">Current Order</h2>
+
             <DeliveryBoyTracking
               data={{
                 deliveryBoyLocation:
