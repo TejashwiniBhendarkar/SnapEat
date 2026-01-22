@@ -161,7 +161,8 @@ export const placeOrder = async (req, res) => {
             item: i.itemId || i.id, // ✅ FIX
             price: Number(i.price),
             quantity: Number(i.quantity),
-            name: i.name
+            name: i.name,
+            image: i.image 
           }))
         }
       })
