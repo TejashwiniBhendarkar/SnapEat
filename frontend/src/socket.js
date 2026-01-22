@@ -6,10 +6,11 @@ const socket = io(import.meta.env.VITE_BACKEND_URL, {
 });
 
 socket.on("connect", () => {
-  console.log("Socket connected:", socket.id);
+  console.log("✅ Socket connected:", socket.id);
 });
 
 export default socket;
+
 
 // import { io } from "socket.io-client";
 
