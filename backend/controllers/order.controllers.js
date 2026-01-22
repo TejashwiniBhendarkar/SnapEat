@@ -382,6 +382,10 @@ export const updateOrderStatus = async (req, res) => {
     const { status } = req.body;
 
     const order = await Order.findById(orderId).populate("shopOrders.shop");
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
     const shopOrder = order.shopOrders.find(
       so => String(so.shop._id) === String(shopId)
     );
@@ -392,30 +396,23 @@ export const updateOrderStatus = async (req, res) => {
 
     shopOrder.status = status;
 
+    // 🔥 ONLY WHEN MOVED TO OUT OF DELIVERY
     if (status === "out of delivery" && !shopOrder.assignment) {
-      const { latitude, longitude } = order.deliveryAddress;
 
+      // ✅ STEP 1: FIND ONLINE DELIVERY BOYS (NO GEO FILTER)
       const deliveryBoys = await User.find({
         role: "deliveryBoy",
-        socketId: { $ne: null },
-        location: {
-          $near: {
-            $geometry: {
-              type: "Point",
-              coordinates: [longitude, latitude]
-            },
-            $maxDistance: 5000
-          }
-        }
+        socketId: { $ne: null }
       });
 
-      console.log("📡 Nearby delivery boys:", deliveryBoys.length);
+      console.log("📡 Online delivery boys:", deliveryBoys.length);
 
       if (deliveryBoys.length === 0) {
         await order.save();
         return res.json({ message: "No delivery boys online" });
       }
 
+      // ✅ STEP 2: CREATE ASSIGNMENT
       const assignment = await DeliveryAssignment.create({
         order: order._id,
         shop: shopOrder.shop._id,
@@ -427,6 +424,7 @@ export const updateOrderStatus = async (req, res) => {
       shopOrder.assignment = assignment._id;
       await order.save();
 
+      // ✅ STEP 3: EMIT TO ALL ONLINE DELIVERY BOYS
       const io = req.app.get("io");
 
       deliveryBoys.forEach(boy => {
@@ -449,6 +447,80 @@ export const updateOrderStatus = async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 };
+
+// export const updateOrderStatus = async (req, res) => {
+//   try {
+//     const { orderId, shopId } = req.params;
+//     const { status } = req.body;
+
+//     const order = await Order.findById(orderId).populate("shopOrders.shop");
+//     const shopOrder = order.shopOrders.find(
+//       so => String(so.shop._id) === String(shopId)
+//     );
+
+//     if (!shopOrder) {
+//       return res.status(400).json({ message: "Shop order not found" });
+//     }
+
+//     shopOrder.status = status;
+
+//     if (status === "out of delivery" && !shopOrder.assignment) {
+//       const { latitude, longitude } = order.deliveryAddress;
+
+//       const deliveryBoys = await User.find({
+//         role: "deliveryBoy",
+//         socketId: { $ne: null },
+//         location: {
+//           $near: {
+//             $geometry: {
+//               type: "Point",
+//               coordinates: [longitude, latitude]
+//             },
+//             $maxDistance: 5000
+//           }
+//         }
+//       });
+
+//       console.log("📡 Nearby delivery boys:", deliveryBoys.length);
+
+//       if (deliveryBoys.length === 0) {
+//         await order.save();
+//         return res.json({ message: "No delivery boys online" });
+//       }
+
+//       const assignment = await DeliveryAssignment.create({
+//         order: order._id,
+//         shop: shopOrder.shop._id,
+//         shopOrderId: shopOrder._id,
+//         broadcastedTo: deliveryBoys.map(b => b._id),
+//         status: "broadcasted"
+//       });
+
+//       shopOrder.assignment = assignment._id;
+//       await order.save();
+
+//       const io = req.app.get("io");
+
+//       deliveryBoys.forEach(boy => {
+//         console.log("📦 Sending assignment to:", boy._id);
+
+//         io.to(boy.socketId).emit("newAssignment", {
+//           assignmentId: assignment._id,
+//           shopName: shopOrder.shop.name,
+//           deliveryAddress: order.deliveryAddress,
+//           items: shopOrder.shopOrderItems,
+//           subtotal: shopOrder.subtotal
+//         });
+//       });
+//     }
+
+//     return res.json({ message: "Order moved to out for delivery" });
+
+//   } catch (error) {
+//     console.error("updateOrderStatus error:", error);
+//     return res.status(500).json({ message: error.message });
+//   }
+// };
 
 
 export const getDeliveryBoyAssignment = async (req, res) => {
