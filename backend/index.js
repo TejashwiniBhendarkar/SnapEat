@@ -21,7 +21,7 @@ const server = http.createServer(app);
 /* ✅ ALLOWED ORIGINS */
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://cravecart.onrender.com"
+  "https://cravecartt.onrender.com"
 ];
 
 /* ✅ EXPRESS CORS */
