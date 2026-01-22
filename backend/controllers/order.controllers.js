@@ -649,72 +649,54 @@ export const sendDeliveryOtp = async (req, res) => {
 };
 
 
+
 // export const verifyDeliveryOtp = async (req, res) => {
 //   try {
 //     const { orderId, shopOrderId, otp } = req.body;
+//     const deliveryBoyId = req.userId;
 
-//     // 🔍 Find order
-//     const order = await Order.findById(orderId).populate("user");
+//     const order = await Order.findById(orderId);
 //     if (!order) {
 //       return res.status(400).json({ message: "Order not found" });
 //     }
 
-//     // 🔍 Find shop order
 //     const shopOrder = order.shopOrders.id(shopOrderId);
 //     if (!shopOrder) {
 //       return res.status(400).json({ message: "Shop order not found" });
 //     }
 
-//     // ❌ OTP validation
 //     if (
 //       shopOrder.deliveryOtp !== otp ||
 //       !shopOrder.otpExpires ||
 //       shopOrder.otpExpires < Date.now()
 //     ) {
-//       return res.status(400).json({ message: "Invalid or Expired OTP" });
+//       return res.status(400).json({ message: "Invalid or expired OTP" });
 //     }
 
-//     // ✅ Mark delivered
+//     // ✅ CRITICAL FIX
 //     shopOrder.status = "delivered";
 //     shopOrder.deliveredAt = new Date();
-//     shopOrder.deliveryOtp = null;
-//     shopOrder.otpExpires = null;
+//     shopOrder.assignedDeliveryBoy = deliveryBoyId;
 
 //     await order.save();
 
-//     // ✅ Update assignment → completed
-//     const assignment = await DeliveryAssignment.findOne({
-//       order: order._id,
+//     await DeliveryAssignment.deleteOne({
 //       shopOrderId: shopOrder._id,
-//       assignedTo: shopOrder.assignedDeliveryBoy
+//       order: order._id,
+//       assignedTo: deliveryBoyId
 //     });
 
-//     if (assignment) {
-//       assignment.status = "completed";
-//       await assignment.save();
-//     }
-
-//     // 💰 UPDATE DELIVERY BOY EARNINGS
-//     const DELIVERY_EARNING = 30; // ₹30 per delivery
-
-//     await User.findByIdAndUpdate(
-//       shopOrder.assignedDeliveryBoy,
-//       { $inc: { earnings: DELIVERY_EARNING } }
-//     );
-
 //     return res.status(200).json({
-//       message: "Order Delivered Successfully!",
-//       earned: DELIVERY_EARNING
+//       message: "Order Delivered Successfully!"
 //     });
 
 //   } catch (error) {
-//     console.error("verifyDeliveryOtp error:", error);
+//     console.error(error);
 //     return res.status(500).json({
-//       message: "Verify delivery OTP error"
+//       message: "verify delivery otp error"
 //     });
 //   }
 // };
-
 export const verifyDeliveryOtp = async (req, res) => {
   try {
     const { orderId, shopOrderId, otp } = req.body;
@@ -722,14 +704,23 @@ export const verifyDeliveryOtp = async (req, res) => {
 
     const order = await Order.findById(orderId);
     if (!order) {
-      return res.status(400).json({ message: "Order not found" });
+      return res.status(404).json({ message: "Order not found" });
     }
 
     const shopOrder = order.shopOrders.id(shopOrderId);
     if (!shopOrder) {
-      return res.status(400).json({ message: "Shop order not found" });
+      return res.status(404).json({ message: "Shop order not found" });
     }
 
+    // 🔒 Authorization check
+    if (
+      shopOrder.assignedDeliveryBoy &&
+      shopOrder.assignedDeliveryBoy.toString() !== deliveryBoyId
+    ) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // 🔐 OTP validation
     if (
       shopOrder.deliveryOtp !== otp ||
       !shopOrder.otpExpires ||
@@ -738,10 +729,14 @@ export const verifyDeliveryOtp = async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired OTP" });
     }
 
-    // ✅ CRITICAL FIX
+    // ✅ Mark delivered
     shopOrder.status = "delivered";
     shopOrder.deliveredAt = new Date();
     shopOrder.assignedDeliveryBoy = deliveryBoyId;
+
+    // ✅ Clear OTP
+    shopOrder.deliveryOtp = null;
+    shopOrder.otpExpires = null;
 
     await order.save();
 
@@ -751,12 +746,19 @@ export const verifyDeliveryOtp = async (req, res) => {
       assignedTo: deliveryBoyId
     });
 
+    // 🔔 Optional socket notify
+    const io = req.app.get("io");
+    io?.to(order.user.toString()).emit("orderDelivered", {
+      orderId,
+      shopOrderId
+    });
+
     return res.status(200).json({
       message: "Order Delivered Successfully!"
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("VERIFY DELIVERY OTP ERROR:", error);
     return res.status(500).json({
       message: "verify delivery otp error"
     });
