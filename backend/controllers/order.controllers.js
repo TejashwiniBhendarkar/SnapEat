@@ -605,23 +605,48 @@ export const getOrderById = async (req, res) => {
 }
 
 export const sendDeliveryOtp = async (req, res) => {
-    try {
-        const { orderId, shopOrderId } = req.body
-        const order = await Order.findById(orderId).populate("user")
-        const shopOrder = order.shopOrders.id(shopOrderId)
-        if (!order || !shopOrder) {
-            return res.status(400).json({ message: "enter valid order/shopOrderid" })
-        }
-        const otp = Math.floor(1000 + Math.random() * 9000).toString()
-        shopOrder.deliveryOtp = otp
-        shopOrder.otpExpires = Date.now() + 5 * 60 * 1000
-        await order.save()
-        await sendDeliveryOtpMail(order.user, otp)
-        return res.status(200).json({ message: `Otp sent Successfuly to ${order?.user?.fullName}` })
-    } catch (error) {
-        return res.status(500).json({ message: `delivery otp error ${error}` })
+  try {
+    const { orderId, shopOrderId } = req.body;
+
+    if (!orderId || !shopOrderId) {
+      return res.status(400).json({ message: "orderId and shopOrderId required" });
     }
-}
+
+    const order = await Order.findById(orderId).populate("user");
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const shopOrder = order.shopOrders.id(shopOrderId);
+
+    if (!shopOrder) {
+      return res.status(404).json({ message: "Shop order not found" });
+    }
+
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+
+    shopOrder.deliveryOtp = otp;
+    shopOrder.otpExpires = Date.now() + 5 * 60 * 1000;
+
+    await order.save();
+
+    // OPTIONAL (do not break API if mail fails)
+    try {
+      await sendDeliveryOtpMail(order.user, otp);
+    } catch (err) {
+      console.error("MAIL ERROR:", err);
+    }
+
+    return res.status(200).json({
+      message: `OTP sent successfully to ${order.user?.fullName || "user"}`,
+    });
+
+  } catch (error) {
+    console.error("SEND DELIVERY OTP ERROR:", error);
+    return res.status(500).json({ message: "Delivery OTP failed" });
+  }
+};
 
 
 // export const verifyDeliveryOtp = async (req, res) => {
