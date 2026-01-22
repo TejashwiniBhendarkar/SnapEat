@@ -18,7 +18,7 @@ function DeliveryBoy() {
   const [message, setMessage] = useState("");
 
   /* =========================
-     💰 EARNINGS (LOCAL ONLY)
+     💰 EARNINGS
   ========================= */
   const ratePerDelivery = 50;
   const [completedDeliveries, setCompletedDeliveries] = useState(() => {
@@ -61,7 +61,7 @@ function DeliveryBoy() {
   }, [socket]);
 
   /* =========================
-     📡 API
+     📡 API CALLS
   ========================= */
   const getAssignments = async () => {
     try {
@@ -88,53 +88,77 @@ function DeliveryBoy() {
   };
 
   const acceptOrder = async id => {
-    await axios.get(
-      `${serverUrl}/api/order/accept-order/${id}`,
-      { withCredentials: true }
-    );
-    getAssignments();
-    getCurrentOrder();
+    try {
+      await axios.get(
+        `${serverUrl}/api/order/accept-order/${id}`,
+        { withCredentials: true }
+      );
+      getAssignments();
+      getCurrentOrder();
+    } catch (err) {
+      alert("Failed to accept order");
+    }
   };
 
+  /* =========================
+     📩 SEND OTP
+  ========================= */
   const sendOtp = async () => {
     setLoading(true);
-    await axios.post(
-      `${serverUrl}/api/order/send-delivery-otp`,
-      {
-        orderId: currentOrder._id,
-        shopOrderId: currentOrder.shopOrder._id
-      },
-      { withCredentials: true }
-    );
-    setShowOtpBox(true);
-    setLoading(false);
+    try {
+      await axios.post(
+        `${serverUrl}/api/order/send-delivery-otp`,
+        {
+          orderId: currentOrder._id,
+          shopOrderId: currentOrder.shopOrder._id
+        },
+        { withCredentials: true }
+      );
+      setShowOtpBox(true);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to send OTP");
+    } finally {
+      setLoading(false);
+    }
   };
 
+  /* =========================
+     ✅ VERIFY OTP (FINAL FIX)
+  ========================= */
   const verifyOtp = async () => {
-    const res = await axios.post(
-      `${serverUrl}/api/order/verify-delivery-otp`,
-      {
-        orderId: currentOrder._id,
-        shopOrderId: currentOrder.shopOrder._id,
-        otp
-      },
-      { withCredentials: true }
-    );
+    setLoading(true);
+    try {
+      const res = await axios.post(
+        `${serverUrl}/api/order/verify-delivery-otp`,
+        {
+          orderId: currentOrder._id,
+          shopOrderId: currentOrder.shopOrder._id,
+          otp
+        },
+        { withCredentials: true }
+      );
 
-    setMessage(res.data.message);
+      setMessage(res.data.message);
 
-    setCompletedDeliveries(prev => {
-      const next = prev + 1;
-      localStorage.setItem("completedDeliveries", next);
-      return next;
-    });
+      setCompletedDeliveries(prev => {
+        const next = prev + 1;
+        localStorage.setItem("completedDeliveries", next);
+        return next;
+      });
 
-    setTimeout(() => {
-      setCurrentOrder(null);
-      setShowOtpBox(false);
-      setOtp("");
-      getAssignments();
-    }, 1200);
+      setTimeout(() => {
+        setCurrentOrder(null);
+        setShowOtpBox(false);
+        setOtp("");
+        setMessage("");
+        getAssignments();
+      }, 1200);
+
+    } catch (err) {
+      alert(err?.response?.data?.message || "OTP verification failed");
+    } finally {
+      setLoading(false); // ✅ THIS STOPS LOADING
+    }
   };
 
   useEffect(() => {
@@ -172,7 +196,6 @@ function DeliveryBoy() {
       {/* ================= CONTENT ================= */}
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
 
-        {/* AVAILABLE ORDERS */}
         {!currentOrder && (
           <section>
             <h2 className="text-xl font-semibold mb-4">Available Orders</h2>
@@ -203,7 +226,6 @@ function DeliveryBoy() {
           </section>
         )}
 
-        {/* CURRENT ORDER */}
         {currentOrder && (
           <section className="bg-white rounded-3xl shadow p-6 space-y-4">
             <h2 className="text-xl font-semibold">Current Order</h2>
@@ -247,9 +269,10 @@ function DeliveryBoy() {
 
                 <button
                   onClick={verifyOtp}
+                  disabled={loading}
                   className="w-full bg-black text-white py-4 rounded-2xl text-lg font-semibold"
                 >
-                  Confirm Delivery
+                  {loading ? <ClipLoader size={20} color="white" /> : "Confirm Delivery"}
                 </button>
               </div>
             )}
@@ -269,8 +292,6 @@ const StatCard = ({ label, value }) => (
 );
 
 export default DeliveryBoy;
-
-
 
 // import React, { useEffect, useState } from "react";
 // import Nav from "./Nav";
@@ -295,11 +316,9 @@ export default DeliveryBoy;
 //      💰 EARNINGS (LOCAL ONLY)
 //   ========================= */
 //   const ratePerDelivery = 50;
-
 //   const [completedDeliveries, setCompletedDeliveries] = useState(() => {
 //     return Number(localStorage.getItem("completedDeliveries")) || 0;
 //   });
-
 //   const totalEarning = completedDeliveries * ratePerDelivery;
 
 //   /* =========================
@@ -308,44 +327,36 @@ export default DeliveryBoy;
 //   useEffect(() => {
 //     if (!socket || !userData || userData.role !== "deliveryBoy") return;
 
-//     let watchId;
+//     const watchId = navigator.geolocation.watchPosition(
+//       pos => {
+//         const lat = pos.coords.latitude;
+//         const lon = pos.coords.longitude;
+//         setDeliveryBoyLocation({ lat, lon });
 
-//     if (navigator.geolocation) {
-//       watchId = navigator.geolocation.watchPosition(
-//         pos => {
-//           const lat = pos.coords.latitude;
-//           const lon = pos.coords.longitude;
+//         socket.emit("updateLocation", {
+//           latitude: lat,
+//           longitude: lon,
+//           userId: userData._id
+//         });
+//       },
+//       err => console.log(err),
+//       { enableHighAccuracy: true }
+//     );
 
-//           setDeliveryBoyLocation({ lat, lon });
-
-//           socket.emit("updateLocation", {
-//             latitude: lat,
-//             longitude: lon,
-//             userId: userData._id
-//           });
-//         },
-//         err => console.log(err),
-//         { enableHighAccuracy: true }
-//       );
-//     }
-
-//     return () => watchId && navigator.geolocation.clearWatch(watchId);
+//     return () => navigator.geolocation.clearWatch(watchId);
 //   }, [socket, userData]);
 
 //   /* =========================
-//      📦 SOCKET LISTENER
+//      📦 SOCKET
 //   ========================= */
 //   useEffect(() => {
 //     if (!socket) return;
-
-//     const onNewAssignment = () => getAssignments();
-//     socket.on("newAssignment", onNewAssignment);
-
-//     return () => socket.off("newAssignment", onNewAssignment);
+//     socket.on("newAssignment", getAssignments);
+//     return () => socket.off("newAssignment", getAssignments);
 //   }, [socket]);
 
 //   /* =========================
-//      📡 API CALLS
+//      📡 API
 //   ========================= */
 //   const getAssignments = async () => {
 //     try {
@@ -371,190 +382,187 @@ export default DeliveryBoy;
 //     }
 //   };
 
-//   /* =========================
-//      📥 ACCEPT ORDER
-//   ========================= */
-//   const acceptOrder = async assignmentId => {
-//     try {
-//       await axios.get(
-//         `${serverUrl}/api/order/accept-order/${assignmentId}`,
-//         { withCredentials: true }
-//       );
-//       await getAssignments();
-//       await getCurrentOrder();
-//     } catch (err) {
-//       console.log(err);
-//     }
+//   const acceptOrder = async id => {
+//     await axios.get(
+//       `${serverUrl}/api/order/accept-order/${id}`,
+//       { withCredentials: true }
+//     );
+//     getAssignments();
+//     getCurrentOrder();
 //   };
 
-//   /* =========================
-//      🔐 OTP FLOW
-//   ========================= */
 //   const sendOtp = async () => {
-//     if (!currentOrder) return;
-
 //     setLoading(true);
-//     try {
-//       await axios.post(
-//         `${serverUrl}/api/order/send-delivery-otp`,
-//         {
-//           orderId: currentOrder._id,
-//           shopOrderId: currentOrder.shopOrder._id
-//         },
-//         { withCredentials: true }
-//       );
-//       setShowOtpBox(true);
-//     } finally {
-//       setLoading(false);
-//     }
+//     await axios.post(
+//       `${serverUrl}/api/order/send-delivery-otp`,
+//       {
+//         orderId: currentOrder._id,
+//         shopOrderId: currentOrder.shopOrder._id
+//       },
+//       { withCredentials: true }
+//     );
+//     setShowOtpBox(true);
+//     setLoading(false);
 //   };
 
 //   const verifyOtp = async () => {
-//     try {
-//       const res = await axios.post(
-//         `${serverUrl}/api/order/verify-delivery-otp`,
-//         {
-//           orderId: currentOrder._id,
-//           shopOrderId: currentOrder.shopOrder._id,
-//           otp
-//         },
-//         { withCredentials: true }
-//       );
+//     const res = await axios.post(
+//       `${serverUrl}/api/order/verify-delivery-otp`,
+//       {
+//         orderId: currentOrder._id,
+//         shopOrderId: currentOrder.shopOrder._id,
+//         otp
+//       },
+//       { withCredentials: true }
+//     );
 
-//       setMessage(res.data.message);
+//     setMessage(res.data.message);
 
-//       // ✅ UPDATE EARNINGS (FRONTEND ONLY)
-//       setCompletedDeliveries(prev => {
-//         const updated = prev + 1;
-//         localStorage.setItem("completedDeliveries", updated);
-//         return updated;
-//       });
+//     setCompletedDeliveries(prev => {
+//       const next = prev + 1;
+//       localStorage.setItem("completedDeliveries", next);
+//       return next;
+//     });
 
-//       setTimeout(() => {
-//         setCurrentOrder(null);
-//         setShowOtpBox(false);
-//         setOtp("");
-//         getAssignments();
-//       }, 1000);
-//     } catch (err) {
-//       console.log(err);
-//     }
+//     setTimeout(() => {
+//       setCurrentOrder(null);
+//       setShowOtpBox(false);
+//       setOtp("");
+//       getAssignments();
+//     }, 1200);
 //   };
 
-//   /* =========================
-//      🔁 INITIAL LOAD
-//   ========================= */
 //   useEffect(() => {
 //     if (!userData || userData.role !== "deliveryBoy") return;
 //     getAssignments();
 //     getCurrentOrder();
 //   }, [userData]);
 
-//   /* =========================
-//      🛑 SAFETY
-//   ========================= */
 //   if (!userData || userData.role !== "deliveryBoy") {
 //     return <div className="p-6 text-center">Unauthorized</div>;
 //   }
 
 //   return (
-//     <div className="w-screen min-h-screen bg-[#fff9f6] flex flex-col items-center gap-5">
+//     <div className="min-h-screen w-full bg-[#fff9f6]">
 //       <Nav />
 
-//       {/* PROFILE */}
-//       <div className="bg-white p-5 rounded-xl shadow w-[90%] text-center">
-//         <h1 className="text-xl font-bold text-[#ff4d2d]">
-//           Welcome, {userData.fullName}
-//         </h1>
-//         <p className="text-sm text-gray-500">
-//           Completed Deliveries: {completedDeliveries}
-//         </p>
-//         <p className="text-lg font-bold text-green-600">
-//           Earnings: ₹{totalEarning}
-//         </p>
+//       {/* ================= HERO ================= */}
+//       <div className="w-full bg-gradient-to-r from-orange-500 to-red-500 px-6 py-10">
+//         <div className="max-w-6xl mx-auto text-white">
+//           <h1 className="text-3xl font-bold">
+//             Hi, {userData.fullName} 👋
+//           </h1>
+//           <p className="opacity-90 mt-1">
+//             {currentOrder ? "Delivering an order" : "You are online & available"}
+//           </p>
+
+//           <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+//             <StatCard label="Deliveries" value={completedDeliveries} />
+//             <StatCard label="Earnings" value={`₹${totalEarning}`} />
+//             <StatCard label="Status" value={currentOrder ? "Busy" : "Available"} />
+//           </div>
+//         </div>
 //       </div>
 
-//       {/* AVAILABLE ORDERS */}
-//       {!currentOrder && (
-//         <div className="bg-white p-5 rounded-xl shadow w-[90%]">
-//           <h2 className="font-bold mb-3">Available Orders</h2>
+//       {/* ================= CONTENT ================= */}
+//       <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
 
-//           {availableAssignments.length === 0 ? (
-//             <p className="text-gray-400 text-sm">No orders available</p>
-//           ) : (
-//             availableAssignments.map((a, i) => (
-//               <div
-//                 key={i}
-//                 className="border p-4 rounded-lg flex justify-between items-center mb-3"
+//         {/* AVAILABLE ORDERS */}
+//         {!currentOrder && (
+//           <section>
+//             <h2 className="text-xl font-semibold mb-4">Available Orders</h2>
+
+//             {availableAssignments.length === 0 ? (
+//               <div className="bg-white p-8 rounded-2xl shadow text-center text-gray-400">
+//                 No orders near you right now
+//               </div>
+//             ) : (
+//               <div className="grid md:grid-cols-2 gap-6">
+//                 {availableAssignments.map((a, i) => (
+//                   <div key={i} className="bg-white p-6 rounded-2xl shadow">
+//                     <p className="font-semibold text-lg">{a.shopName}</p>
+//                     <p className="text-sm text-gray-500 mt-1">
+//                       {a.deliveryAddress?.text}
+//                     </p>
+
+//                     <button
+//                       onClick={() => acceptOrder(a.assignmentId)}
+//                       className="mt-5 w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold"
+//                     >
+//                       Accept Order
+//                     </button>
+//                   </div>
+//                 ))}
+//               </div>
+//             )}
+//           </section>
+//         )}
+
+//         {/* CURRENT ORDER */}
+//         {currentOrder && (
+//           <section className="bg-white rounded-3xl shadow p-6 space-y-4">
+//             <h2 className="text-xl font-semibold">Current Order</h2>
+
+//             <DeliveryBoyTracking
+//               data={{
+//                 deliveryBoyLocation:
+//                   deliveryBoyLocation || {
+//                     lat: userData.location.coordinates[1],
+//                     lon: userData.location.coordinates[0]
+//                   },
+//                 customerLocation: {
+//                   lat: currentOrder.deliveryAddress.latitude,
+//                   lon: currentOrder.deliveryAddress.longitude
+//                 }
+//               }}
+//             />
+
+//             {!showOtpBox ? (
+//               <button
+//                 onClick={sendOtp}
+//                 disabled={loading}
+//                 className="w-full bg-green-500 text-white py-4 rounded-2xl text-lg font-semibold"
 //               >
-//                 <div>
-//                   <p className="font-semibold">{a.shopName}</p>
-//                   <p className="text-xs text-gray-500">
-//                     {a.deliveryAddress?.text}
+//                 {loading ? <ClipLoader size={20} color="white" /> : "Mark as Delivered"}
+//               </button>
+//             ) : (
+//               <div>
+//                 <input
+//                   value={otp}
+//                   onChange={e => setOtp(e.target.value)}
+//                   placeholder="Enter delivery OTP"
+//                   className="w-full border p-4 rounded-xl mb-3 text-center text-lg tracking-widest"
+//                 />
+
+//                 {message && (
+//                   <p className="text-green-600 text-center mb-2">
+//                     {message}
 //                   </p>
-//                 </div>
+//                 )}
+
 //                 <button
-//                   onClick={() => acceptOrder(a.assignmentId)}
-//                   className="bg-orange-500 text-white px-4 py-1 rounded"
+//                   onClick={verifyOtp}
+//                   className="w-full bg-black text-white py-4 rounded-2xl text-lg font-semibold"
 //                 >
-//                   Accept
+//                   Confirm Delivery
 //                 </button>
 //               </div>
-//             ))
-//           )}
-//         </div>
-//       )}
-
-//       {/* CURRENT ORDER */}
-//       {currentOrder && (
-//         <div className="bg-white p-5 rounded-xl shadow w-[90%]">
-//           <h2 className="font-bold mb-2">Current Order</h2>
-
-//           <DeliveryBoyTracking
-//             data={{
-//               deliveryBoyLocation:
-//                 deliveryBoyLocation || {
-//                   lat: userData.location.coordinates[1],
-//                   lon: userData.location.coordinates[0]
-//                 },
-//               customerLocation: {
-//                 lat: currentOrder.deliveryAddress.latitude,
-//                 lon: currentOrder.deliveryAddress.longitude
-//               }
-//             }}
-//           />
-
-//           {!showOtpBox ? (
-//             <button
-//               onClick={sendOtp}
-//               disabled={loading}
-//               className="w-full bg-green-500 text-white py-2 mt-4 rounded"
-//             >
-//               {loading ? <ClipLoader size={18} color="white" /> : "Mark Delivered"}
-//             </button>
-//           ) : (
-//             <div className="mt-4">
-//               <input
-//                 value={otp}
-//                 onChange={e => setOtp(e.target.value)}
-//                 placeholder="Enter OTP"
-//                 className="w-full border p-2 rounded mb-2"
-//               />
-//               {message && (
-//                 <p className="text-green-600 text-center mb-2">{message}</p>
-//               )}
-//               <button
-//                 onClick={verifyOtp}
-//                 className="w-full bg-orange-500 text-white py-2 rounded"
-//               >
-//                 Verify OTP
-//               </button>
-//             </div>
-//           )}
-//         </div>
-//       )}
+//             )}
+//           </section>
+//         )}
+//       </div>
 //     </div>
 //   );
 // }
 
+// /* ================= STAT CARD ================= */
+// const StatCard = ({ label, value }) => (
+//   <div className="bg-white/20 backdrop-blur-md rounded-2xl p-4 text-center">
+//     <p className="text-sm opacity-90">{label}</p>
+//     <p className="text-2xl font-bold mt-1">{value}</p>
+//   </div>
+// );
+
 // export default DeliveryBoy;
+
+
