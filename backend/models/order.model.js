@@ -8,7 +8,8 @@ const shopOrderItemSchema = new mongoose.Schema({
     },
     name:String,
     price:Number,
-    quantity:Number
+    quantity:Number,
+     image: String 
 }, { timestamps: true })
 
 const shopOrderSchema = new mongoose.Schema({
