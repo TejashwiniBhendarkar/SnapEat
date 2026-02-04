@@ -33,7 +33,7 @@ app.use(
 );
 
 /* 🔥 REQUIRED FOR RENDER (OPTIONS PREFLIGHT) */
-app.options("*", cors({
+app.options("/", cors({
   origin: FRONTEND_URL,
   credentials: true
 }));
